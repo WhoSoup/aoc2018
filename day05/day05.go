@@ -32,7 +32,7 @@ func solve(buf []byte) int {
 	}
 }
 
-func main() {
+func main2() {
 	buf, _ := ioutil.ReadFile("input.txt")
 
 	min := solve(buf)
