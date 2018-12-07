@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 )
 
@@ -13,49 +12,45 @@ const workers = 5
 const timeoffset = 60
 
 type node struct {
-	dependencies int
-	dependents   []int
+	parents  int
+	children []int
 }
 type worker struct {
 	letter int
 	time   int
 }
 
-func main() {
-
+func build() []node {
 	file, _ := os.Open(filename)
 	defer file.Close()
 
 	nodes := make([]node, letters)
 
 	var a, b byte
-
 	for {
-		count, err := fmt.Fscanf(file, "Step %c must be finished before step %c can begin.\n", &a, &b)
+		_, err := fmt.Fscanf(file, "Step %c must be finished before step %c can begin.\n", &a, &b)
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			break
-		} else if err != nil {
-			log.Fatal(err)
 		}
 
-		if count != 2 {
-			continue
-		}
-
-		nodes[b-'A'].dependencies++
-		nodes[a-'A'].dependents = append(nodes[a-'A'].dependents, int(b-'A'))
-
-		//fmt.Printf("%c, %c\n", a, b)
+		nodes[b-'A'].parents++
+		nodes[a-'A'].children = append(nodes[a-'A'].children, int(b-'A'))
 	}
+
+	return nodes
+}
+
+func part1() {
+	nodes := build()
 
 Outer:
 	for {
 		for letter := range nodes {
-			if nodes[letter].dependencies == 0 {
+			if nodes[letter].parents == 0 {
 				fmt.Printf("%c", 'A'+letter)
-				nodes[letter].dependencies--
-				for _, i := range nodes[letter].dependents {
-					nodes[i].dependencies--
+				nodes[letter].parents--
+				for _, i := range nodes[letter].children {
+					nodes[i].parents--
 				}
 				continue Outer
 			}
@@ -64,83 +59,59 @@ Outer:
 	}
 
 	fmt.Println()
+}
 
-	file.Close()
-	file, _ = os.Open(filename)
-	nodes = make([]node, letters)
-	for {
-		count, err := fmt.Fscanf(file, "Step %c must be finished before step %c can begin.\n", &a, &b)
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			break
-		} else if err != nil {
-			log.Fatal(err)
-		}
-
-		if count != 2 {
-			continue
-		}
-
-		nodes[b-'A'].dependencies++
-		nodes[a-'A'].dependents = append(nodes[a-'A'].dependents, int(b-'A'))
-
-		//fmt.Printf("%c, %c\n", a, b)
-	}
+func part2() {
+	nodes := build()
 
 	pool := make([]worker, workers)
 	elapsed := 0
 
+Work:
 	for {
-		// find free worker
-		for i := range pool {
-			if pool[i].time > 0 {
-				pool[i].time--
-
-				if pool[i].time == 0 {
-					letter := pool[i].letter
-					fmt.Printf("%c", 'A'+letter)
-					for _, i := range nodes[letter].dependents {
-						nodes[i].dependencies--
-					}
-				}
-			}
-		}
-
-		//fmt.Println(pool)
-
 		elapsed++
 
-		done := true
+		// process workers
+		for i := range pool {
+			if pool[i].time > 0 { // worker doing work
+				pool[i].time--
 
-	Assigned:
-		for letter := range nodes {
-			if nodes[letter].dependencies == 0 {
-				for i := range pool {
-					if pool[i].time == 0 {
-						//fmt.Printf("Assigning %c to Pool#%d\n", letter+'A', i)
-						pool[i].letter = letter
-						pool[i].time = timeoffset + letter + 1
-						nodes[letter].dependencies--
-						continue Assigned
+				if pool[i].time == 0 { // worker is done
+					letter := pool[i].letter
+					fmt.Printf("%c", 'A'+letter)
+					for _, i := range nodes[letter].children {
+						nodes[i].parents--
 					}
 				}
-			} else if nodes[letter].dependencies > 0 {
-				done = false
 			}
 		}
 
-		if done {
-			for _, w := range pool {
-				if w.time > 0 {
-					done = false
+		// assignments
+		for letter := range nodes {
+			if nodes[letter].parents == 0 {
+				for i := range pool {
+					if pool[i].time == 0 { // worker available
+						pool[i] = worker{letter, timeoffset + letter + 1}
+						nodes[letter].parents--
+						break
+					}
 				}
 			}
+		}
 
-			if done {
-				break
+		for _, w := range pool {
+			if w.time > 0 {
+				continue Work
 			}
 		}
+
+		break
 	}
 
 	fmt.Println(" ", elapsed-1)
+}
 
+func main() {
+	part1()
+	part2()
 }
