@@ -33,28 +33,34 @@ func (s state) offsetY() int {
 	return s.minY
 }
 
-func move(pts []point) (s state) {
-	s.maxX = minInt
-	s.maxY = minInt
-	s.minX = maxInt
-	s.minY = maxInt
+func max(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func move(pts []point) state {
+	s := state{maxInt, minInt, maxInt, minInt}
 
 	for i := range pts {
 		pts[i].x += pts[i].vx
-		if pts[i].x > s.maxX {
-			s.maxX = pts[i].x
-		} else if pts[i].x < s.minX {
-			s.minX = pts[i].x
-		}
+		s.maxX = max(s.maxX, pts[i].x)
+		s.minX = min(s.minX, pts[i].x)
+
 		pts[i].y += pts[i].vy
-		if pts[i].y > s.maxY {
-			s.maxY = pts[i].y
-		} else if pts[i].y < s.minY {
-			s.minY = pts[i].y
-		}
+		s.maxY = max(s.maxY, pts[i].y)
+		s.minY = min(s.minY, pts[i].y)
 	}
 
-	return
+	return s
 }
 
 func print(pts []point, s state) {
