@@ -10,50 +10,63 @@ type point struct {
 	x, y, vx, vy int
 }
 
+type state struct {
+	minX, maxX, minY, maxY int
+}
+
 const maxInt = int(^uint(0) >> 1)
 const minInt = -maxInt - 1
 
-func move(pts []point) (int, int, int, int, int) {
-	maxX := minInt
-	maxY := minInt
-	minX := maxInt
-	minY := maxInt
+func (s state) area() int {
+	return s.width() * s.height()
+}
+func (s state) width() int {
+	return s.maxX - s.minX
+}
+func (s state) height() int {
+	return s.maxY - s.minY
+}
+func (s state) offsetX() int {
+	return s.minX
+}
+func (s state) offsetY() int {
+	return s.minY
+}
+
+func move(pts []point) (s state) {
+	s.maxX = minInt
+	s.maxY = minInt
+	s.minX = maxInt
+	s.minY = maxInt
 
 	for i := range pts {
 		pts[i].x += pts[i].vx
-		if pts[i].x > maxX {
-			maxX = pts[i].x
-		} else if pts[i].x < minX {
-			minX = pts[i].x
+		if pts[i].x > s.maxX {
+			s.maxX = pts[i].x
+		} else if pts[i].x < s.minX {
+			s.minX = pts[i].x
 		}
 		pts[i].y += pts[i].vy
-		if pts[i].y > maxY {
-			maxY = pts[i].y
-		} else if pts[i].y < minY {
-			minY = pts[i].y
+		if pts[i].y > s.maxY {
+			s.maxY = pts[i].y
+		} else if pts[i].y < s.minY {
+			s.minY = pts[i].y
 		}
 	}
 
-	return (maxX - minX) * (maxY - minY), maxX - minX, maxY - minY, minX, minY
+	return
 }
 
-func cp(old []point) []point {
-	new := make([]point, len(old))
-	for i, e := range old {
-		new[i] = point{e.x, e.y, e.vx, e.vy}
-	}
-	return new
-}
+func print(pts []point, s state) {
+	f := make([][]byte, s.height()+1)
 
-func print(pts []point, width int, height int, offX int, offY int) {
-	f := make([][]byte, height+1)
-
-	for i := 0; i < height+1; i++ {
-		f[i] = make([]byte, width+1)
+	for i := 0; i < s.height()+1; i++ {
+		f[i] = make([]byte, s.width()+1)
 	}
 
 	for _, p := range pts {
-		f[p.y-offY][p.x-offX] = '#'
+		// undo the last step too
+		f[p.y-s.offsetY()-p.vy][p.x-s.offsetX()-p.vx] = '#'
 	}
 
 	for _, line := range f {
@@ -78,24 +91,17 @@ func main() {
 		points = append(points, p)
 	}
 
-	old := cp(points)
-	area, width, height, offX, offY := move(points)
+	state := move(points)
 	moves := 1
 
 	for {
-		old = cp(points)
-		a, w, h, ox, oy := move(points)
-		if a < area {
-			area = a
-			width = w
-			height = h
-			offX = ox
-			offY = oy
-		} else if a > area {
-			print(old, width, height, offX, offY)
+		newstate := move(points)
+		if newstate.area() > state.area() {
+			print(points, state)
 			fmt.Println("Seconds:", moves)
 			break
 		}
+		state = newstate
 		moves++
 	}
 }
