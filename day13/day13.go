@@ -11,7 +11,11 @@ type cart struct {
 	car           byte
 	x, y          int
 	intersections int
-	vx, vy        int
+	crashed       bool
+}
+
+func (c cart) coord() string {
+	return fmt.Sprintf("%d,%d", c.x, c.y)
 }
 
 type byPos []cart
@@ -27,17 +31,6 @@ func (c byPos) Less(i, j int) bool {
 	return false
 }
 
-var turnLeft = map[byte]byte{
-	'^': '<',
-	'<': 'v',
-	'v': '>',
-	'>': '^'}
-var turnRight = map[byte]byte{
-	'^': '>',
-	'>': 'v',
-	'v': '<',
-	'<': '^'}
-
 func removeCarts(paths []string) (carts []cart) {
 	for y := 0; y < len(paths); y++ {
 		for x := 0; x < len(paths[y]); x++ {
@@ -49,7 +42,7 @@ func removeCarts(paths []string) (carts []cart) {
 			case 'v':
 				fallthrough
 			case '^':
-				c := cart{paths[y][x], x, y, 0, 0, 0}
+				c := cart{paths[y][x], x, y, 0, false}
 				carts = append(carts, c)
 			}
 		}
@@ -62,36 +55,128 @@ func removeCarts(paths []string) (carts []cart) {
 	return
 }
 
-func move(car cart, pos byte) (r cart) {
-	return
+func move(car cart, pos byte) cart {
+	switch car.car {
+	case '^':
+		if pos == '+' {
+			pos = []byte{'\\', '|', '/'}[car.intersections%3]
+			car.intersections++
+		}
+		switch pos {
+		case '/':
+			car.car = '>'
+			car.x++
+		case '\\':
+			car.car = '<'
+			car.x--
+		case '|':
+			car.y--
+		}
+
+	case '>':
+		if pos == '+' {
+			pos = []byte{'/', '-', '\\'}[car.intersections%3]
+			car.intersections++
+		}
+		switch pos {
+		case '-':
+			car.x++
+		case '/':
+			car.car = '^'
+			car.y--
+		case '\\':
+			car.car = 'v'
+			car.y++
+		}
+	case 'v':
+		if pos == '+' {
+			pos = []byte{'\\', '|', '/'}[car.intersections%3]
+			car.intersections++
+		}
+		switch pos {
+		case '|':
+			car.y++
+		case '/':
+			car.car = '<'
+			car.x--
+		case '\\':
+			car.car = '>'
+			car.x++
+		}
+	case '<':
+		if pos == '+' {
+			pos = []byte{'/', '-', '\\'}[car.intersections%3]
+			car.intersections++
+		}
+		switch pos {
+		case '-':
+			car.x--
+		case '/':
+			car.car = 'v'
+			car.y++
+		case '\\':
+			car.car = '^'
+			car.y--
+		}
+	}
+	return car
 }
 
-func moveCarts(paths []string, carts []cart) {
+func moveCarts(paths []string, carts []cart) (remaining []cart, crashed bool) {
 	sort.Sort(byPos(carts))
 
-	var occupied map[string]bool
+	occupied := make(map[string]bool, len(carts))
 	for _, c := range carts {
-		occupied[string(c.x)+","+string(c.y)] = true
+		occupied[c.coord()] = true
 	}
 
 	for i, car := range carts {
+		if car.crashed {
+			continue
+		}
+
 		pos := paths[car.y][car.x]
 
+		delete(occupied, car.coord())
 		carts[i] = move(car, pos)
+
+		if _, ok := occupied[carts[i].coord()]; ok {
+			fmt.Println("Crash at", carts[i].coord())
+
+			for j := range carts {
+				if carts[j].coord() == carts[i].coord() { // includes i = j
+					carts[j].crashed = true
+					delete(occupied, carts[j].coord())
+				}
+			}
+		} else {
+			occupied[carts[i].coord()] = true
+		}
 	}
+
+	for _, c := range carts {
+		if !c.crashed {
+			remaining = append(remaining, c)
+		} else {
+			crashed = true
+		}
+	}
+
+	return
 }
 
 func main() {
-	data, _ := ioutil.ReadFile("input-test.txt")
-
-	fmt.Println(string(data))
+	data, _ := ioutil.ReadFile("input.txt")
 
 	paths := strings.Split(string(data), "\n")
-
 	cars := removeCarts(paths)
 
-	fmt.Println(cars)
-	moveCarts(paths, cars)
+	for {
+		cars, _ = moveCarts(paths, cars)
+		if len(cars) == 1 {
+			break
+		}
+	}
 
-	fmt.Println(cars)
+	fmt.Println("Last Car at:", cars[0].coord())
 }
